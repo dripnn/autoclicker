@@ -1,10 +1,12 @@
 package com.autoclicker.mod;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.entity.projectile.EntityFireball;
 import net.minecraft.entity.projectile.EntityThrowable;
+import net.minecraft.inventory.Slot;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemBow;
 import net.minecraft.item.ItemStack;
@@ -42,7 +44,7 @@ public class AutoClickerMod {
     
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
-        // Register keybindings (will show up in Minecraft controls menu)
+        // Register keybindings
         toggleLeftKey = new KeyBinding("Toggle Left AutoClicker", Keyboard.KEY_R, "AutoClicker");
         toggleRightKey = new KeyBinding("Toggle Right AutoClicker", Keyboard.KEY_T, "AutoClicker");
         
@@ -115,65 +117,25 @@ public class AutoClickerMod {
             return;
         }
         
-        // Perform left click
+        // Set next click delay
         int tickDelay = Math.max(1, 20 / leftCPS);
         leftClickDelay = tickDelay;
         
         // Check if in inventory or in game
-        if (mc.currentScreen != null) {
-            // In inventory - use proper GUI click handling
-            try {
-                int mouseX = Mouse.getX() * mc.currentScreen.width / mc.displayWidth;
-                int mouseY = mc.currentScreen.height - Mouse.getY() * mc.currentScreen.height / mc.displayHeight - 1;
-                
-                // Try to call handleMouseClick if it's a container GUI
-                if (mc.currentScreen instanceof net.minecraft.client.gui.inventory.GuiContainer) {
-                    net.minecraft.client.gui.inventory.GuiContainer container = 
-                        (net.minecraft.client.gui.inventory.GuiContainer) mc.currentScreen;
-                    
-                    // Use reflection to access protected handleMouseClick
-                    try {
-                        java.lang.reflect.Method handleMouseClick = container.getClass()
-                            .getSuperclass()
-                            .getDeclaredMethod("handleMouseClick", 
-                                net.minecraft.inventory.Slot.class, 
-                                int.class, 
-                                int.class, 
-                                int.class);
-                        handleMouseClick.setAccessible(true);
-                        
-                        // Get the slot under the mouse
-                        java.lang.reflect.Method getSlotAtPosition = container.getClass()
-                            .getSuperclass()
-                            .getDeclaredMethod("getSlotAtPosition", int.class, int.class);
-                        getSlotAtPosition.setAccessible(true);
-                        
-                        net.minecraft.inventory.Slot slot = 
-                            (net.minecraft.inventory.Slot) getSlotAtPosition.invoke(container, mouseX, mouseY);
-                        
-                        if (slot != null) {
-                            // Perform left click on slot
-                            handleMouseClick.invoke(container, slot, slot.slotNumber, 0, 0);
-                        }
-                    } catch (Exception e) {
-                        // Reflection failed, ignore
-                    }
-                }
-            } catch (Exception e) {
-                // Ignore errors
-            }
-        } else {
-            // In game - normal attack
-            // Check if holding a projectile weapon
+        if (mc.currentScreen != null && mc.currentScreen instanceof GuiContainer) {
+            // In inventory - handle inventory clicking
+            handleInventoryClick((GuiContainer) mc.currentScreen);
+        } else if (mc.currentScreen == null) {
+            // In game - check for projectile weapons first
             if (isHoldingProjectileWeapon(mc)) {
                 return;
             }
             
-            // Check if looking at a projectile entity
             if (isLookingAtProjectile(mc)) {
                 return;
             }
             
+            // Perform game left click
             if (mc.objectMouseOver != null) {
                 if (mc.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY) {
                     mc.playerController.attackEntity(mc.thePlayer, mc.objectMouseOver.entityHit);
@@ -190,27 +152,44 @@ public class AutoClickerMod {
         }
     }
     
+    private void handleInventoryClick(GuiContainer container) {
+        try {
+            int mouseX = Mouse.getX() * container.width / Minecraft.getMinecraft().displayWidth;
+            int mouseY = container.height - Mouse.getY() * container.height / Minecraft.getMinecraft().displayHeight - 1;
+            
+            // Get slot at mouse position using reflection
+            java.lang.reflect.Method getSlotAtPosition = GuiContainer.class.getDeclaredMethod("getSlotAtPosition", int.class, int.class);
+            getSlotAtPosition.setAccessible(true);
+            Slot slot = (Slot) getSlotAtPosition.invoke(container, mouseX, mouseY);
+            
+            if (slot != null && slot.canTakeStack(Minecraft.getMinecraft().thePlayer)) {
+                // Perform the click using playerController
+                Minecraft.getMinecraft().playerController.windowClick(
+                    container.inventorySlots.windowId,
+                    slot.slotNumber,
+                    0, // Left click
+                    0, // Normal click mode
+                    Minecraft.getMinecraft().thePlayer
+                );
+            }
+        } catch (Exception e) {
+            // Silently fail
+        }
+    }
+    
     private void tickRightClicker(Minecraft mc) {
         // Only autoclick if right mouse button is being held down
         if (!mc.gameSettings.keyBindUseItem.isKeyDown()) {
             return;
         }
         
-        // Don't right-click in inventories/GUIs (chests, furnaces, etc.)
+        // Don't work in GUIs
         if (mc.currentScreen != null) {
             return;
         }
         
-        // Check if holding a projectile weapon or consumable
+        // Check if holding a projectile weapon
         if (isHoldingProjectileWeapon(mc)) {
-            return;
-        }
-        
-        // Don't right-click if looking at a chest or container block
-        // This prevents opening chests/furnaces/etc. with right clicker
-        if (mc.objectMouseOver != null && mc.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
-            // Just return and don't do anything when looking at blocks
-            // This prevents opening containers and causing crashes
             return;
         }
         
@@ -220,13 +199,30 @@ public class AutoClickerMod {
             return;
         }
         
-        // Perform right click
+        // Set next click delay
         int tickDelay = Math.max(1, 20 / rightCPS);
         rightClickDelay = tickDelay;
         
-        // Only use held item (for blocking shields, etc.)
-        // Don't interact with blocks to prevent crashes
-        mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
+        // Perform right click - place blocks or use items
+        if (mc.objectMouseOver != null) {
+            if (mc.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
+                // Right click on block (place blocks, open doors, etc.)
+                mc.playerController.onPlayerRightClick(
+                    mc.thePlayer,
+                    mc.theWorld,
+                    mc.thePlayer.getHeldItem(),
+                    mc.objectMouseOver.getBlockPos(),
+                    mc.objectMouseOver.sideHit,
+                    mc.objectMouseOver.hitVec
+                );
+            } else {
+                // Right click in air (use item like shield)
+                mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
+            }
+        } else {
+            // No target - just use item
+            mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
+        }
     }
     
     private boolean isHoldingProjectileWeapon(Minecraft mc) {
@@ -243,7 +239,7 @@ public class AutoClickerMod {
             return true;
         }
         
-        // Check for throwable items by item ID
+        // Check for throwable items
         String itemName = Item.itemRegistry.getNameForObject(item).toString();
         
         return itemName.contains("snowball") ||
@@ -269,11 +265,11 @@ public class AutoClickerMod {
     
     // Getters and setters for commands
     public static void setLeftCPS(int cps) {
-        leftCPS = Math.max(1, Math.min(100, cps)); // Clamp between 1-100
+        leftCPS = Math.max(1, Math.min(100, cps));
     }
     
     public static void setRightCPS(int cps) {
-        rightCPS = Math.max(1, Math.min(100, cps)); // Clamp between 1-100
+        rightCPS = Math.max(1, Math.min(100, cps));
     }
     
     public static int getLeftCPS() {
