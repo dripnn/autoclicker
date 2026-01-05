@@ -131,13 +131,18 @@ public class AutoClickerMod {
         
         // Check if in inventory or in game
         if (mc.currentScreen != null) {
-            // In inventory - perform actual left click
+            // In inventory - perform actual left click using reflection
             try {
                 int mouseX = Mouse.getX() * mc.currentScreen.width / mc.displayWidth;
                 int mouseY = mc.currentScreen.height - Mouse.getY() * mc.currentScreen.height / mc.displayHeight - 1;
-                mc.currentScreen.mouseClicked(mouseX, mouseY, 0); // 0 = left click
+                
+                // Use reflection to call protected mouseClicked method
+                java.lang.reflect.Method mouseClickedMethod = mc.currentScreen.getClass()
+                    .getDeclaredMethod("mouseClicked", int.class, int.class, int.class);
+                mouseClickedMethod.setAccessible(true);
+                mouseClickedMethod.invoke(mc.currentScreen, mouseX, mouseY, 0); // 0 = left click
             } catch (Exception e) {
-                // Ignore errors
+                // If reflection fails, just ignore
             }
         } else {
             // In game - normal attack
