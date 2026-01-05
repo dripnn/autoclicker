@@ -1,0 +1,16 @@
+[
+{
+  "modid": "autoclicker",
+  "name": "Smart AutoClicker",
+  "description": "An intelligent autoclicker with configurable CPS, inventory support, and projectile detection",
+  "version": "1.0.0",
+  "mcversion": "1.8.9",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["YourName"],
+  "credits": "",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]

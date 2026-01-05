@@ -1,0 +1,89 @@
+# GRADLE WRAPPER ERROR - SOLUTION
+
+You're getting this error:
+```
+Error: Could not find or load main class org.gradle.wrapper.GradleWrapperMain
+```
+
+This means the `gradle-wrapper.jar` file is missing or incomplete.
+
+## Solution 1: Use the Automated Build Script (EASIEST)
+
+I've included `build-mod.bat` which handles everything automatically:
+
+1. **Double-click `build-mod.bat`** in Windows Explorer
+2. It will automatically download Gradle and build your mod
+3. Wait for it to complete (10-20 minutes total)
+4. Your mod will be in `build\libs\autoclicker-1.0.0.jar`
+
+## Solution 2: Fix the Gradle Wrapper
+
+1. **Double-click `fix-gradle-wrapper.bat`**
+2. It will download the missing gradle-wrapper.jar file
+3. Then run: `.\gradlew setupDecompWorkspace`
+
+## Solution 3: Manual Gradle Download
+
+If the scripts don't work (firewall/antivirus blocking):
+
+1. **Download Gradle 2.14 manually:**
+   - Go to: https://services.gradle.org/distributions/gradle-2.14-bin.zip
+   - Download and extract to a folder (like `C:\gradle-2.14`)
+
+2. **Build using the full path:**
+   ```
+   C:\gradle-2.14\bin\gradle setupDecompWorkspace
+   C:\gradle-2.14\bin\gradle build
+   ```
+
+## Solution 4: Download the Wrapper File Manually
+
+1. **Download gradle-wrapper.jar:**
+   - Go to: https://raw.githubusercontent.com/gradle/gradle/v2.14.0/gradle/wrapper/gradle-wrapper.jar
+   - Save it to: `gradle\wrapper\gradle-wrapper.jar` (in your mod folder)
+
+2. **Then run:**
+   ```
+   .\gradlew setupDecompWorkspace
+   ```
+
+## Which Solution Should You Use?
+
+**→ Try Solution 1 first (build-mod.bat) - it's the easiest!**
+
+If that doesn't work due to firewall/antivirus:
+- Try Solution 2 (fix-gradle-wrapper.bat)
+- Or use Solution 3 (manual download)
+
+## Common Issues
+
+**"Access Denied" or "Cannot download"**
+- Your antivirus or firewall is blocking the download
+- Temporarily disable it, or use Solution 3 (manual download)
+
+**"Java not found"**
+- Make sure Java 8 is installed
+- Check with: `java -version`
+
+**Still having issues?**
+- Make sure you're in the correct folder (`autoclicker` folder)
+- Check that you have internet connection
+- Try running PowerShell or Command Prompt as Administrator
+
+## Quick Test
+
+To verify Java is working:
+```
+java -version
+```
+
+You should see something like:
+```
+java version "1.8.0_xxx"
+```
+
+If you don't see version 1.8, you need to install Java 8!
+
+---
+
+**TIP:** The easiest way is to just double-click `build-mod.bat` and let it handle everything!

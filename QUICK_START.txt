@@ -1,0 +1,92 @@
+# AutoClicker Mod - QUICK START
+
+## 📦 What You Have
+
+You have the complete source code for a Minecraft 1.8.9 AutoClicker mod with:
+- ✅ Left & Right click autoclickers
+- ✅ Configurable CPS via commands (`/lcps` and `/rcps`)
+- ✅ Customizable hotkeys in Minecraft controls
+- ✅ Works in inventories
+- ✅ Smart projectile detection
+
+## 🚀 Fastest Way to Build
+
+### Windows:
+1. Install Java 8: https://adoptium.net/temurin/releases/?version=8
+2. Extract `autoclicker-source.zip`
+3. Open Command Prompt in that folder
+4. Run: `gradlew setupDecompWorkspace` (wait 10-15 mins)
+5. Run: `gradlew build` (wait 2-5 mins)
+6. Get your mod from `build\libs\autoclicker-1.0.0.jar`
+
+### Mac/Linux:
+1. Install Java 8: https://adoptium.net/temurin/releases/?version=8
+2. Extract the source files
+3. Open Terminal in that folder
+4. Run: `chmod +x gradlew`
+5. Run: `./gradlew setupDecompWorkspace` (wait 10-15 mins)
+6. Run: `./gradlew build` (wait 2-5 mins)
+7. Get your mod from `build/libs/autoclicker-1.0.0.jar`
+
+## 📖 Full Documentation
+
+- **BUILD_GUIDE.md** - Detailed build instructions with troubleshooting
+- **README.md** - Complete mod documentation, features, and usage
+
+## 🎮 Using the Mod
+
+Once built and installed:
+
+1. **Toggle Autoclickers:**
+   - Press `R` for left-click autoclicker (or change in Controls)
+   - Press `T` for right-click autoclicker (or change in Controls)
+
+2. **Set CPS:**
+   - `/lcps 15` - Set left-click to 15 CPS
+   - `/rcps 10` - Set right-click to 10 CPS
+   - `/lcps` - View current left CPS
+   - `/rcps` - View current right CPS
+
+3. **Customize Keybinds:**
+   - Open Minecraft Controls menu
+   - Find "AutoClicker" category
+   - Click and press new key
+
+## ⚠️ Important
+
+- Always check server rules before using autoclickers
+- Keep CPS reasonable (12-16 for safety)
+- Left autoclicker won't work with bows/throwables (by design)
+
+## 🆘 Need Help?
+
+1. Can't build? Read `BUILD_GUIDE.md` for detailed troubleshooting
+2. Build works but mod doesn't? Check you have Forge 1.8.9 installed
+3. Still stuck? Make sure Java 8 is installed (NOT Java 11, 17, etc.)
+
+## 📁 Files Included
+
+```
+autoclicker/
+├── BUILD_GUIDE.md          ← How to build (detailed)
+├── README.md               ← Full documentation
+├── QUICK_START.txt         ← This file!
+├── build.gradle            ← Build configuration
+├── gradlew + gradlew.bat   ← Build scripts
+├── gradle/wrapper/         ← Gradle files
+└── src/                    ← Source code
+    └── main/
+        ├── java/
+        │   └── com/autoclicker/mod/
+        │       ├── AutoClickerMod.java
+        │       ├── CommandLCPS.java
+        │       └── CommandRCPS.java
+        └── resources/
+            └── mcmod.info
+```
+
+## 🎉 That's It!
+
+Extract, build, and enjoy your autoclicker!
+
+Questions? Check BUILD_GUIDE.md or README.md for answers!
