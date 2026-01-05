@@ -19,6 +19,7 @@ import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
 
 @Mod(modid = AutoClickerMod.MODID, version = AutoClickerMod.VERSION, name = AutoClickerMod.NAME, clientSideOnly = true)
 public class AutoClickerMod {
@@ -130,10 +131,11 @@ public class AutoClickerMod {
         
         // Check if in inventory or in game
         if (mc.currentScreen != null) {
-            // In inventory - simulate inventory click
+            // In inventory - perform actual left click
             try {
-                // Click the slot under the mouse
-                mc.currentScreen.handleMouseInput();
+                int mouseX = Mouse.getX() * mc.currentScreen.width / mc.displayWidth;
+                int mouseY = mc.currentScreen.height - Mouse.getY() * mc.currentScreen.height / mc.displayHeight - 1;
+                mc.currentScreen.mouseClicked(mouseX, mouseY, 0); // 0 = left click
             } catch (Exception e) {
                 // Ignore errors
             }
@@ -161,6 +163,16 @@ public class AutoClickerMod {
             return;
         }
         
+        // Don't right-click in inventories/GUIs (chests, furnaces, etc.)
+        if (mc.currentScreen != null) {
+            return;
+        }
+        
+        // Check if holding a projectile weapon or consumable
+        if (isHoldingProjectileWeapon(mc)) {
+            return;
+        }
+        
         // Handle click timing
         if (rightClickDelay > 0) {
             rightClickDelay--;
@@ -171,31 +183,21 @@ public class AutoClickerMod {
         int tickDelay = Math.max(1, 20 / rightCPS);
         rightClickDelay = tickDelay;
         
-        // Check if in inventory or in game
-        if (mc.currentScreen != null) {
-            // In inventory - simulate right click
-            try {
-                mc.currentScreen.handleMouseInput();
-            } catch (Exception e) {
-                // Ignore errors
+        // In game only - use playerController to right click
+        if (mc.objectMouseOver != null) {
+            if (mc.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
+                mc.playerController.onPlayerRightClick(
+                    mc.thePlayer,
+                    mc.theWorld,
+                    mc.thePlayer.getHeldItem(),
+                    mc.objectMouseOver.getBlockPos(),
+                    mc.objectMouseOver.sideHit,
+                    mc.objectMouseOver.hitVec
+                );
             }
-        } else {
-            // In game - use playerController to right click
-            if (mc.objectMouseOver != null) {
-                if (mc.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
-                    mc.playerController.onPlayerRightClick(
-                        mc.thePlayer,
-                        mc.theWorld,
-                        mc.thePlayer.getHeldItem(),
-                        mc.objectMouseOver.getBlockPos(),
-                        mc.objectMouseOver.sideHit,
-                        mc.objectMouseOver.hitVec
-                    );
-                }
-            }
-            // Always use the held item (for eating, blocking, etc.)
-            mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
         }
+        // Always use the held item (for blocking, etc.)
+        mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
     }
     
     private boolean isHoldingProjectileWeapon(Minecraft mc) {
