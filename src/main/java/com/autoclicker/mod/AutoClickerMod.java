@@ -170,8 +170,21 @@ public class AutoClickerMod {
                 // Ignore errors
             }
         } else {
-            // In game - normal right click
-            mc.rightClickMouse();
+            // In game - use playerController to right click
+            if (mc.objectMouseOver != null) {
+                if (mc.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
+                    mc.playerController.onPlayerRightClick(
+                        mc.thePlayer,
+                        mc.theWorld,
+                        mc.thePlayer.getHeldItem(),
+                        mc.objectMouseOver.getBlockPos(),
+                        mc.objectMouseOver.sideHit,
+                        mc.objectMouseOver.hitVec
+                    );
+                }
+            }
+            // Always use the held item (for eating, blocking, etc.)
+            mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
         }
     }
     
