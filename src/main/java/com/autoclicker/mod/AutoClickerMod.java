@@ -103,6 +103,11 @@ public class AutoClickerMod {
     }
     
     private void tickLeftClicker(Minecraft mc) {
+        // Only autoclick if left mouse button is being held down
+        if (!mc.gameSettings.keyBindAttack.isKeyDown()) {
+            return;
+        }
+        
         // Check if holding a projectile weapon (don't auto-click with projectiles)
         if (mc.currentScreen == null && isHoldingProjectileWeapon(mc)) {
             return;
@@ -151,6 +156,11 @@ public class AutoClickerMod {
     }
     
     private void tickRightClicker(Minecraft mc) {
+        // Only autoclick if right mouse button is being held down
+        if (!mc.gameSettings.keyBindUseItem.isKeyDown()) {
+            return;
+        }
+        
         // Handle click timing
         if (rightClickDelay > 0) {
             rightClickDelay--;
