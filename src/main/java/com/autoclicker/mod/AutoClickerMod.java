@@ -153,24 +153,25 @@ public class AutoClickerMod {
     }
     
     private void handleInventoryClick(GuiContainer container) {
+        int mouseX = Mouse.getX() * container.width / Minecraft.getMinecraft().displayWidth;
+        int mouseY = container.height - Mouse.getY() * container.height / Minecraft.getMinecraft().displayHeight - 1;
+        
         try {
-            int mouseX = Mouse.getX() * container.width / Minecraft.getMinecraft().displayWidth;
-            int mouseY = container.height - Mouse.getY() * container.height / Minecraft.getMinecraft().displayHeight - 1;
-            
-            // Get slot at mouse position using reflection
-            java.lang.reflect.Method getSlotAtPosition = GuiContainer.class.getDeclaredMethod("getSlotAtPosition", int.class, int.class);
-            getSlotAtPosition.setAccessible(true);
-            Slot slot = (Slot) getSlotAtPosition.invoke(container, mouseX, mouseY);
-            
-            if (slot != null && slot.canTakeStack(Minecraft.getMinecraft().thePlayer)) {
-                // Perform the click using playerController
-                Minecraft.getMinecraft().playerController.windowClick(
-                    container.inventorySlots.windowId,
-                    slot.slotNumber,
-                    0, // Left click
-                    0, // Normal click mode
-                    Minecraft.getMinecraft().thePlayer
-                );
+            // Just call mouseClicked directly - simulate a left click at current mouse position
+            // Use reflection to access the protected method
+            java.lang.reflect.Method mouseClicked = container.getClass()
+                .getDeclaredMethod("mouseClicked", int.class, int.class, int.class);
+            mouseClicked.setAccessible(true);
+            mouseClicked.invoke(container, mouseX, mouseY, 0); // 0 = left click
+        } catch (NoSuchMethodException e) {
+            // Method doesn't exist in this class, try superclass
+            try {
+                java.lang.reflect.Method mouseClicked = GuiContainer.class
+                    .getDeclaredMethod("mouseClicked", int.class, int.class, int.class);
+                mouseClicked.setAccessible(true);
+                mouseClicked.invoke(container, mouseX, mouseY, 0);
+            } catch (Exception ex) {
+                // Silently fail
             }
         } catch (Exception e) {
             // Silently fail
