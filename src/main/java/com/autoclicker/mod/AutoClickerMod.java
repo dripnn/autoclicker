@@ -6,6 +6,7 @@ import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.projectile.EntityArrow;
 import net.minecraft.entity.projectile.EntityFireball;
 import net.minecraft.entity.projectile.EntityThrowable;
+import net.minecraft.inventory.Container;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemBow;
@@ -22,6 +23,9 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 @Mod(modid = AutoClickerMod.MODID, version = AutoClickerMod.VERSION, name = AutoClickerMod.NAME, clientSideOnly = true)
 public class AutoClickerMod {
@@ -41,6 +45,10 @@ public class AutoClickerMod {
     
     private static int leftCPS = 20;
     private static int rightCPS = 20;
+    
+    private static boolean debugMode = false;
+    private static int inventoryClickAttempts = 0;
+    private static int inventoryClickSuccesses = 0;
     
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
@@ -78,6 +86,16 @@ public class AutoClickerMod {
                     new ChatComponentText("Left AutoClicker: " + status + 
                     EnumChatFormatting.GRAY + " (" + leftCPS + " CPS)")
                 );
+                
+                // Show inventory stats if was enabled
+                if (!leftClickerEnabled && inventoryClickAttempts > 0) {
+                    mc.thePlayer.addChatMessage(
+                        new ChatComponentText(EnumChatFormatting.YELLOW + 
+                        "Inventory clicks: " + inventoryClickSuccesses + "/" + inventoryClickAttempts)
+                    );
+                    inventoryClickAttempts = 0;
+                    inventoryClickSuccesses = 0;
+                }
             }
         }
         
@@ -123,8 +141,12 @@ public class AutoClickerMod {
         
         // Check if in inventory or in game
         if (mc.currentScreen != null && mc.currentScreen instanceof GuiContainer) {
-            // In inventory - handle inventory clicking
-            handleInventoryClick((GuiContainer) mc.currentScreen);
+            // In inventory - try EVERY possible method
+            inventoryClickAttempts++;
+            boolean success = handleInventoryClick((GuiContainer) mc.currentScreen, mc);
+            if (success) {
+                inventoryClickSuccesses++;
+            }
         } else if (mc.currentScreen == null) {
             // In game - check for projectile weapons first
             if (isHoldingProjectileWeapon(mc)) {
@@ -152,30 +174,143 @@ public class AutoClickerMod {
         }
     }
     
-    private void handleInventoryClick(GuiContainer container) {
-        int mouseX = Mouse.getX() * container.width / Minecraft.getMinecraft().displayWidth;
-        int mouseY = container.height - Mouse.getY() * container.height / Minecraft.getMinecraft().displayHeight - 1;
+    private boolean handleInventoryClick(GuiContainer container, Minecraft mc) {
+        int mouseX = Mouse.getX() * container.width / mc.displayWidth;
+        int mouseY = container.height - Mouse.getY() * container.height / mc.displayHeight - 1;
         
+        Slot targetSlot = null;
+        Container inventoryContainer = null;
+        
+        // METHOD 1: Try to get inventorySlots field (Container)
         try {
-            // Just call mouseClicked directly - simulate a left click at current mouse position
-            // Use reflection to access the protected method
-            java.lang.reflect.Method mouseClicked = container.getClass()
-                .getDeclaredMethod("mouseClicked", int.class, int.class, int.class);
-            mouseClicked.setAccessible(true);
-            mouseClicked.invoke(container, mouseX, mouseY, 0); // 0 = left click
-        } catch (NoSuchMethodException e) {
-            // Method doesn't exist in this class, try superclass
+            Field inventorySlotsField = GuiContainer.class.getDeclaredField("inventorySlots");
+            inventorySlotsField.setAccessible(true);
+            inventoryContainer = (Container) inventorySlotsField.get(container);
+        } catch (Exception e) {
+            // Try alternate field name
             try {
-                java.lang.reflect.Method mouseClicked = GuiContainer.class
-                    .getDeclaredMethod("mouseClicked", int.class, int.class, int.class);
-                mouseClicked.setAccessible(true);
-                mouseClicked.invoke(container, mouseX, mouseY, 0);
-            } catch (Exception ex) {
-                // Silently fail
+                Field field = GuiContainer.class.getDeclaredField("field_147002_h");
+                field.setAccessible(true);
+                inventoryContainer = (Container) field.get(container);
+            } catch (Exception e2) {
+                // Can't get container
+            }
+        }
+        
+        // METHOD 2: Try getSlotAtPosition method
+        try {
+            Method getSlotMethod = GuiContainer.class.getDeclaredMethod("getSlotAtPosition", int.class, int.class);
+            getSlotMethod.setAccessible(true);
+            targetSlot = (Slot) getSlotMethod.invoke(container, mouseX, mouseY);
+        } catch (Exception e) {
+            // Try obfuscated name
+            try {
+                Method getSlotMethod = GuiContainer.class.getDeclaredMethod("func_146975_c", int.class, int.class);
+                getSlotMethod.setAccessible(true);
+                targetSlot = (Slot) getSlotMethod.invoke(container, mouseX, mouseY);
+            } catch (Exception e2) {
+                // Method doesn't exist
+            }
+        }
+        
+        // METHOD 3: If getSlotAtPosition failed, try getting hoveredSlot field
+        if (targetSlot == null) {
+            try {
+                Field hoveredSlotField = GuiContainer.class.getDeclaredField("hoveredSlot");
+                hoveredSlotField.setAccessible(true);
+                targetSlot = (Slot) hoveredSlotField.get(container);
+            } catch (Exception e) {
+                // Try obfuscated name
+                try {
+                    Field field = GuiContainer.class.getDeclaredField("field_147006_u");
+                    field.setAccessible(true);
+                    targetSlot = (Slot) field.get(container);
+                } catch (Exception e2) {
+                    // Try another obfuscated name
+                    try {
+                        Field field = GuiContainer.class.getDeclaredField("theSlot");
+                        field.setAccessible(true);
+                        targetSlot = (Slot) field.get(container);
+                    } catch (Exception e3) {
+                        // Can't find slot field
+                    }
+                }
+            }
+        }
+        
+        // METHOD 4: Manual slot detection by iterating through all slots
+        if (targetSlot == null && inventoryContainer != null) {
+            try {
+                Field xPosField = GuiContainer.class.getDeclaredField("guiLeft");
+                Field yPosField = GuiContainer.class.getDeclaredField("guiTop");
+                xPosField.setAccessible(true);
+                yPosField.setAccessible(true);
+                int guiLeft = (Integer) xPosField.get(container);
+                int guiTop = (Integer) yPosField.get(container);
+                
+                for (Object slotObj : inventoryContainer.inventorySlots) {
+                    Slot slot = (Slot) slotObj;
+                    int slotX = guiLeft + slot.xDisplayPosition;
+                    int slotY = guiTop + slot.yDisplayPosition;
+                    
+                    if (mouseX >= slotX && mouseX < slotX + 16 && 
+                        mouseY >= slotY && mouseY < slotY + 16) {
+                        targetSlot = slot;
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                // Manual detection failed
+            }
+        }
+        
+        // If we found a slot AND container, perform the click
+        if (targetSlot != null && inventoryContainer != null) {
+            try {
+                // Use windowClick - the proper way
+                mc.playerController.windowClick(
+                    inventoryContainer.windowId,
+                    targetSlot.slotNumber,
+                    0, // left mouse button
+                    0, // click mode: normal click
+                    mc.thePlayer
+                );
+                return true;
+            } catch (Exception e) {
+                // Click failed
+                return false;
+            }
+        }
+        
+        // METHOD 5: Last resort - try calling mouseClicked via reflection
+        try {
+            Method mouseClickedMethod = null;
+            Class<?> currentClass = container.getClass();
+            
+            // Walk up class hierarchy to find mouseClicked
+            while (currentClass != null && mouseClickedMethod == null) {
+                try {
+                    mouseClickedMethod = currentClass.getDeclaredMethod("mouseClicked", int.class, int.class, int.class);
+                } catch (NoSuchMethodException e) {
+                    // Try obfuscated name
+                    try {
+                        mouseClickedMethod = currentClass.getDeclaredMethod("func_73864_a", int.class, int.class, int.class);
+                    } catch (NoSuchMethodException e2) {
+                        currentClass = currentClass.getSuperclass();
+                    }
+                }
+            }
+            
+            if (mouseClickedMethod != null) {
+                mouseClickedMethod.setAccessible(true);
+                mouseClickedMethod.invoke(container, mouseX, mouseY, 0);
+                return true;
             }
         } catch (Exception e) {
-            // Silently fail
+            // Reflection failed
         }
+        
+        return false;
     }
     
     private void tickRightClicker(Minecraft mc) {
@@ -204,10 +339,9 @@ public class AutoClickerMod {
         int tickDelay = Math.max(1, 20 / rightCPS);
         rightClickDelay = tickDelay;
         
-        // Perform right click - place blocks or use items
+        // Perform right click
         if (mc.objectMouseOver != null) {
             if (mc.objectMouseOver.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK) {
-                // Right click on block (place blocks, open doors, etc.)
                 mc.playerController.onPlayerRightClick(
                     mc.thePlayer,
                     mc.theWorld,
@@ -217,11 +351,9 @@ public class AutoClickerMod {
                     mc.objectMouseOver.hitVec
                 );
             } else {
-                // Right click in air (use item like shield)
                 mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
             }
         } else {
-            // No target - just use item
             mc.playerController.sendUseItem(mc.thePlayer, mc.theWorld, mc.thePlayer.getHeldItem());
         }
     }
@@ -235,12 +367,10 @@ public class AutoClickerMod {
         
         Item item = heldItem.getItem();
         
-        // Check for bow
         if (item instanceof ItemBow) {
             return true;
         }
         
-        // Check for throwable items
         String itemName = Item.itemRegistry.getNameForObject(item).toString();
         
         return itemName.contains("snowball") ||
@@ -258,13 +388,11 @@ public class AutoClickerMod {
             return false;
         }
         
-        // Check if the entity is a projectile
         return objectMouseOver.entityHit instanceof EntityArrow ||
                objectMouseOver.entityHit instanceof EntityThrowable ||
                objectMouseOver.entityHit instanceof EntityFireball;
     }
     
-    // Getters and setters for commands
     public static void setLeftCPS(int cps) {
         leftCPS = Math.max(1, Math.min(100, cps));
     }
